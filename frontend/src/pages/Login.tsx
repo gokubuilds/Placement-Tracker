@@ -131,7 +131,7 @@ export default function Login({ onLogin }: LoginProps) {
 
           <div className="mb-7">
             <h2 className="text-2xl font-800 text-[#0F172A]">Sign in to your portal</h2>
-            <p className="text-sm text-[#64748B] mt-1.5">NIT Surathkal · Placement Cell 2026</p>
+            <p className="text-sm text-[#64748B] mt-1.5">Anna University · Placement Cell 2026</p>
           </div>
 
           {/* Tab switcher */}
@@ -261,7 +261,7 @@ export default function Login({ onLogin }: LoginProps) {
           </div>
 
           <p className="text-[11px] text-[#94A3B8] text-center mt-6">
-            Secured by Placement Cell · NIT Surathkal © 2026
+            Secured by Placement Cell · Anna University © 2026
           </p>
         </div>
       </div>

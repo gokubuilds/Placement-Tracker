@@ -1524,7 +1524,7 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
               <p className="mono text-[11px] text-[#4F46E5] uppercase tracking-widest">Real-Time Dashboard</p>
             </div>
             <h1 className="text-2xl font-800 text-[#0F172A]">Placement Overview</h1>
-            <p className="text-sm text-[#64748B] mt-1">NIT Surathkal · CSE + ECE · Batch 2026 · Syncing live from SQLite via WebSockets</p>
+            <p className="text-sm text-[#64748B] mt-1">Anna University · CSE + ECE · Batch 2026 · Syncing live from SQLite via WebSockets</p>
           </div>
           <button
             onClick={() => setShowAddDrive(true)}

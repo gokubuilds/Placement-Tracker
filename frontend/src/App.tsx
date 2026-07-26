@@ -342,7 +342,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
             </div>
             <span className="text-sm font-700 text-[#0F172A] hidden sm:block">PlaceTrack</span>
             <span className="text-[#E2E8F0] hidden sm:block">|</span>
-            <span className="text-xs text-[#64748B] hidden sm:block font-500">NIT Surathkal</span>
+            <span className="text-xs text-[#64748B] hidden sm:block font-500">Anna University</span>
           </div>
 
           <div className="flex-1 max-w-sm relative">
