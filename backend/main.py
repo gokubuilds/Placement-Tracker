@@ -321,21 +321,7 @@ async def chat_handler(request: ChatRequest, x_student_id: str = Header(None, al
     normalized_query = request.query.strip().lower().translate(str.maketrans("", "", string.punctuation))
     print(f"Agent prompt: '{request.query}' -> Normalized: '{normalized_query}'")
 
-    # 2. Fallback & Out-of-Scope Pre-check
-    in_scope_keywords = [
-        "stage", "status", "tcs", "infosys", "hexaware", "wipro", "cognizant", "accenture", 
-        "application", "drive", "date", "schedule", "offer", "package", "salary", "ctc", "lpa",
-        "placed", "registered", "unplaced", "total", "count", "branch", "cse", "ece", "it", "eee", "mech",
-        "student", "students", "eligible", "eligibility", "resume", "list", "offer letter"
-    ]
-    
-    is_in_scope = any(keyword in normalized_query for keyword in in_scope_keywords)
-    if not is_in_scope:
-        return ChatResponse(
-            reply="I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status."
-        )
-
-    # 3. Setup Google Antigravity Agent Configuration & Run inside try-except
+    # 2. Setup Google Antigravity Agent Configuration & Run inside try-except
     try:
         # Fetch student profile details from SQLite first to inject into system instruction
         student_profile = ""
@@ -380,32 +366,31 @@ async def chat_handler(request: ChatRequest, x_student_id: str = Header(None, al
         if x_student_id != "OFFICER":
             config.hooks.append(RecordIsolationHook(authenticated_user_id=x_student_id))
 
+        if x_student_id == "OFFICER":
+            identity_info = "Note: You are chatting with the Placement Officer. You can query data for any and all students without isolation restrictions.\n"
+        else:
+            identity_info = f"Note: You are chatting with student ID {x_student_id}. Never query data for any other student ID.\n"
+
+        config.system_instructions = (
+            "You are a College Placement Assistant. You have access to tools for retrieving student applications "
+            "and company drive status from a local SQLite database.\n"
+            "You can ONLY help users check:\n"
+            "1. Application Stages\n"
+            "2. Drive Dates / Upcoming Drives\n"
+            "3. Offer Status\n\n"
+            f"{student_profile}"
+            f"{identity_info}"
+            "If the query is out of scope or you cannot retrieve the information using your tools, "
+            "or you are not confident, you MUST reply with exactly: "
+            "'I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status.'"
+        )
+
         async with Agent(config) as agent:
-
-            if x_student_id == "OFFICER":
-                identity_info = "Note: You are chatting with the Placement Officer. You can query data for any and all students without isolation restrictions.\n"
-            else:
-                identity_info = f"Note: You are chatting with student ID {x_student_id}. Never query data for any other student ID.\n"
-
-            system_instruction = (
-                "You are a College Placement Assistant. You have access to tools for retrieving student applications "
-                "and company drive status from a local SQLite database.\n"
-                "You can ONLY help users check:\n"
-                "1. Application Stages\n"
-                "2. Drive Dates / Upcoming Drives\n"
-                "3. Offer Status\n\n"
-                f"{student_profile}"
-                f"{identity_info}"
-                "If the query is out of scope or you cannot retrieve the information using your tools, "
-                "or you are not confident, you MUST reply with exactly: "
-                "'I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status.'"
-            )
-            
-            agent_response = await agent.chat(normalized_query, system_instruction=system_instruction)
+            agent_response = await agent.chat(normalized_query)
             text_reply = await agent_response.text()
             
-            # Post-check fallback (if agent output suggests low confidence or is empty)
-            if not text_reply or "not confident" in text_reply.lower() or "i cannot help" in text_reply.lower() or "sorry" in text_reply.lower():
+            # Post-check fallback (if agent output is empty)
+            if not text_reply:
                 text_reply = "I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status."
                 
             return ChatResponse(reply=text_reply)
