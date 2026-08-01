@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
+import RecruitmentPipeline from '../components/RecruitmentPipeline'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,27 @@ function chatNow() {
   return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
+export function normalizeStage(stage: string): string {
+  if (!stage) return 'Applied'
+  const lower = stage.toLowerCase().trim()
+  if (lower === 'applied' || lower === 'not applied' || lower === 'screening') return 'Applied'
+  if (lower === 'shortlisted') return 'Shortlisted'
+  if (lower === 'interview' || lower === 'interviewed' || lower === 'final_round') return 'Interviewed'
+  if (lower === 'selected' || lower === 'offered' || lower === 'issued') return 'Selected'
+  if (lower === 'rejected') return 'Rejected'
+  return 'Applied'
+}
+
+export function denormalizeStage(stage: string): string {
+  const s = stage.trim()
+  if (s === 'Selected') return 'offered'
+  if (s === 'Shortlisted') return 'shortlisted'
+  if (s === 'Interviewed') return 'interview'
+  if (s === 'Applied') return 'applied'
+  if (s === 'Rejected') return 'rejected'
+  return 'Not Applied'
+}
+
 
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -203,7 +225,7 @@ function AddDriveModal({ onClose, onAdd }: AddDriveModalProps) {
   }
 
   const inputCls = (err?: string) =>
-    `w-full px-3 py-2 text-sm border rounded outline-none transition-all ${err ? 'border-red-400 focus:border-red-500' : 'border-[#E2E8F0] focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]/20'} bg-white placeholder-[#94A3B8]`
+    `w-full px-3 py-2 text-sm border rounded outline-none transition-all ${err ? 'border-red-400 focus:border-red-500' : 'border-[#E2E8F0] focus:border-[#059669] focus:ring-1 focus:ring-[#059669]/20'} bg-white placeholder-[#94A3B8]`
 
   return (
     <div
@@ -322,7 +344,7 @@ function AddDriveModal({ onClose, onAdd }: AddDriveModalProps) {
               onClick={submit}
               disabled={submitting}
               className="px-5 py-2 text-sm font-600 text-white rounded transition-colors flex items-center gap-2"
-              style={{ background: submitting ? '#818CF8' : '#4F46E5' }}
+              style={{ background: submitting ? '#34D399' : '#059669' }}
             >
               {submitting ? (
                 <>
@@ -392,7 +414,7 @@ function POChatWidget({ drives }: { drives: Drive[] }) {
         const data = await res.json()
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: data.reply, time: chatNow() }])
       } else {
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "I am not confident about that request. I can only help you check student applications, drive dates, and offer status.", time: chatNow() }])
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "I am not sure about that. Please contact the placement office.", time: chatNow() }])
       }
     } catch (e) {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "Error: Could not connect to assistant backend.", time: chatNow() }])
@@ -448,7 +470,7 @@ function POChatWidget({ drives }: { drives: Drive[] }) {
                   <div
                     className="px-3 py-2.5 rounded-md text-sm leading-relaxed whitespace-pre-line"
                     style={msg.from === 'officer'
-                      ? { background: '#4F46E5', color: 'white' }
+                      ? { background: '#059669', color: 'white' }
                       : { background: 'white', color: '#0F172A', border: '1px solid #E2E8F0' }
                     }
                   >
@@ -506,7 +528,7 @@ function POChatWidget({ drives }: { drives: Drive[] }) {
             <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         )}
-        {!open && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#4F46E5] border-2 border-white text-[8px] text-white flex items-center justify-center font-700">AI</span>}
+        {!open && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#059669] border-2 border-white text-[8px] text-white flex items-center justify-center font-700">AI</span>}
       </button>
     </div>
   )
@@ -605,9 +627,10 @@ function parseSheetToRows(workbook: XLSX.WorkBook): StudentRow[] {
 
 interface StudentSpreadsheetProps {
   rows: StudentRow[]
+  onRefresh?: () => void
 }
 
-function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
+function StudentSpreadsheet({ rows, onRefresh }: StudentSpreadsheetProps) {
   const [editing, setEditing] = useState<{ rowId: string; col: ColKey } | null>(null)
   const [editVal, setEditVal] = useState('')
   const [search, setSearch] = useState('')
@@ -694,11 +717,12 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
         role: r.role || "SWE Intern"
       }))
       
-      await fetch(`http://localhost:8000/api/applications/bulk`, {
+      const res = await fetch(`http://localhost:8000/api/applications/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records })
       })
+      if (res.ok && onRefresh) onRefresh()
       
       setShowPreview(false)
       setUploadFile(null)
@@ -730,13 +754,14 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
     if (!row) return
     
     try {
-      await fetch(`http://localhost:8000/api/applications/${editing.rowId}`, {
+      const res = await fetch(`http://localhost:8000/api/applications/${editing.rowId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           [editing.col]: editVal
         })
       })
+      if (res.ok && onRefresh) onRefresh()
     } catch (e) {
       console.error("Error updating applications:", e)
     }
@@ -769,6 +794,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
         })
       })
       if (res.ok) {
+        if (onRefresh) onRefresh()
         const data = await res.json()
         setTimeout(() => startEdit(data.id, 'name', ''), 100)
       }
@@ -778,13 +804,16 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
   }
 
   const deleteSelected = async () => {
+    let deletedAny = false
     for (const id of Array.from(selected)) {
       try {
-        await fetch(`http://localhost:8000/api/applications/${id}`, { method: 'DELETE' })
+        const res = await fetch(`http://localhost:8000/api/applications/${id}`, { method: 'DELETE' })
+        if (res.ok) deletedAny = true
       } catch (e) {
         console.error("Error deleting application:", e)
       }
     }
+    if (deletedAny && onRefresh) onRefresh()
     setSelected(new Set())
   }
 
@@ -825,8 +854,8 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
 
   const SortIcon = ({ col }: { col: ColKey }) => (
     <span className="ml-1 inline-flex flex-col" style={{ opacity: sortCol === col ? 1 : 0.3 }}>
-      <svg width="7" height="5" viewBox="0 0 7 5" fill={sortCol === col && sortDir === 'asc' ? '#4F46E5' : '#94A3B8'}><path d="M3.5 0L7 5H0z" /></svg>
-      <svg width="7" height="5" viewBox="0 0 7 5" fill={sortCol === col && sortDir === 'desc' ? '#4F46E5' : '#94A3B8'} style={{ marginTop: 1 }}><path d="M3.5 5L0 0h7z" /></svg>
+      <svg width="7" height="5" viewBox="0 0 7 5" fill={sortCol === col && sortDir === 'asc' ? '#059669' : '#94A3B8'}><path d="M3.5 0L7 5H0z" /></svg>
+      <svg width="7" height="5" viewBox="0 0 7 5" fill={sortCol === col && sortDir === 'desc' ? '#059669' : '#94A3B8'} style={{ marginTop: 1 }}><path d="M3.5 5L0 0h7z" /></svg>
     </span>
   )
 
@@ -837,7 +866,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
     <div className="bg-white rounded-md border border-[#E2E8F0] overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
           <span className="text-sm font-700 text-[#0F172A]">Upload Student Data</span>
@@ -859,21 +888,21 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-3 py-10 cursor-pointer transition-all duration-150 select-none"
             style={{
-              borderColor: dragOver ? '#4F46E5' : '#CBD5E1',
-              background: dragOver ? '#EEF2FF' : '#FAFAFA',
+              borderColor: dragOver ? '#059669' : '#CBD5E1',
+              background: dragOver ? '#ECFDF5' : '#FAFAFA',
             }}
           >
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center transition-colors"
-              style={{ background: dragOver ? '#EEF2FF' : '#F1F5F9' }}
+              style={{ background: dragOver ? '#ECFDF5' : '#F1F5F9' }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dragOver ? '#4F46E5' : '#94A3B8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dragOver ? '#059669' : '#94A3B8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
             </div>
             {uploadFile && !showPreview ? (
               <div className="text-center">
-                <p className="text-sm font-600 text-[#4F46E5]">Processing {uploadFile.name}…</p>
+                <p className="text-sm font-600 text-[#059669]">Processing {uploadFile.name}…</p>
                 <p className="text-xs text-[#94A3B8] mt-1">Parsing spreadsheet</p>
               </div>
             ) : (
@@ -931,7 +960,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                     onClick={() => setUploadMode(m)}
                     className="text-xs px-3 py-1.5 rounded transition-all font-500 capitalize"
                     style={uploadMode === m
-                      ? { background: '#4F46E5', color: 'white' }
+                      ? { background: '#059669', color: 'white' }
                       : { color: '#64748B' }
                     }
                   >
@@ -964,7 +993,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                   <tbody>
                     {uploadPreview.slice(0, 5).map((r, i) => (
                       <tr key={i} className="border-b border-[#F1F5F9] hover:bg-[#F8F9FC]">
-                        <td className="px-3 py-2 mono text-[#4F46E5] font-600">{r.studentId || '—'}</td>
+                        <td className="px-3 py-2 mono text-[#059669] font-600">{r.studentId || '—'}</td>
                         <td className="px-3 py-2 font-500 text-[#0F172A]">{r.name || '—'}</td>
                         <td className="px-3 py-2 text-[#64748B]">{r.branch || '—'}</td>
                         <td className="px-3 py-2 mono font-600" style={{ color: Number(r.cgpa) >= 8 ? '#15803D' : '#C2410C' }}>{r.cgpa || '—'}</td>
@@ -993,7 +1022,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                 onClick={confirmImport}
                 disabled={importing}
                 className="flex items-center gap-2 px-5 py-2 rounded text-sm font-600 text-white transition-colors"
-                style={{ background: importing ? '#818CF8' : '#4F46E5' }}
+                style={{ background: importing ? '#34D399' : '#059669' }}
               >
                 {importing ? (
                   <><svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Importing…</>
@@ -1027,12 +1056,12 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
       <div className="px-4 py-3 border-b border-[#E2E8F0] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
             <span className="text-sm font-700 text-[#0F172A]">Student Data</span>
           </div>
           <span className="mono text-[11px] text-[#94A3B8]">{filtered.length} of {rows.length} rows</span>
           {selected.size > 0 && (
-            <span className="mono text-[11px] text-[#4F46E5]">{selected.size} selected</span>
+            <span className="mono text-[11px] text-[#059669]">{selected.size} selected</span>
           )}
         </div>
 
@@ -1046,7 +1075,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search students…"
-              className="pl-7 pr-3 py-1.5 text-xs border border-[#E2E8F0] rounded bg-[#F8F9FC] outline-none focus:border-[#4F46E5] transition-colors w-44"
+              className="pl-7 pr-3 py-1.5 text-xs border border-[#E2E8F0] rounded bg-[#F8F9FC] outline-none focus:border-[#059669] transition-colors w-44"
             />
           </div>
 
@@ -1059,7 +1088,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
           )}
 
           {/* Add row */}
-          <button onClick={addRow} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-600 text-[#4F46E5] border border-[#C7D2FE] bg-[#EEF2FF] rounded hover:bg-[#E0E7FF] transition-colors">
+          <button onClick={addRow} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-600 text-[#059669] border border-[#6EE7B7] bg-[#ECFDF5] rounded hover:bg-[#D1FAE5] transition-colors">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Student
           </button>
@@ -1101,14 +1130,14 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                   type="checkbox"
                   checked={selected.size === filtered.length && filtered.length > 0}
                   onChange={toggleAll}
-                  className="accent-[#4F46E5] cursor-pointer"
+                  className="accent-[#059669] cursor-pointer"
                 />
               </th>
               {COLS.map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="border border-[#E2E8F0] px-2 py-2 text-left font-600 uppercase tracking-widest text-[#64748B] cursor-pointer hover:bg-[#EEF2FF] select-none whitespace-nowrap"
+                  className="border border-[#E2E8F0] px-2 py-2 text-left font-600 uppercase tracking-widest text-[#64748B] cursor-pointer hover:bg-[#ECFDF5] select-none whitespace-nowrap"
                   style={{ fontSize: 10 }}
                 >
                   <span className="flex items-center gap-0.5">
@@ -1125,16 +1154,16 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
               <tr
                 key={row.id}
                 className="group"
-                style={{ background: selected.has(row.id) ? '#EEF2FF' : ri % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}
+                style={{ background: selected.has(row.id) ? '#ECFDF5' : ri % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}
               >
                 {/* Row number + checkbox */}
-                <td className="border border-[#E2E8F0] px-2 py-0 text-center select-none" style={{ background: selected.has(row.id) ? '#E0E7FF' : '#F8F9FC' }}>
+                <td className="border border-[#E2E8F0] px-2 py-0 text-center select-none" style={{ background: selected.has(row.id) ? '#D1FAE5' : '#F8F9FC' }}>
                   <div className="flex items-center justify-center gap-1">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
                       onChange={() => toggleSelect(row.id)}
-                      className="accent-[#4F46E5] cursor-pointer"
+                      className="accent-[#059669] cursor-pointer"
                     />
                     <span className="mono text-[10px] text-[#CBD5E1] w-5 text-right">{ri + 1}</span>
                   </div>
@@ -1164,7 +1193,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                             onChange={e => setEditVal(e.target.value)}
                             onBlur={commitEdit}
                             onKeyDown={handleKeyDown}
-                            className="w-full h-full px-2 text-xs border-2 border-[#4F46E5] outline-none bg-white"
+                            className="w-full h-full px-2 text-xs border-2 border-[#059669] outline-none bg-white"
                           >
                             <option>Issued</option><option>Pending</option><option>N/A</option>
                           </select>
@@ -1175,7 +1204,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                             onChange={e => setEditVal(e.target.value)}
                             onBlur={commitEdit}
                             onKeyDown={handleKeyDown}
-                            className="w-full h-full px-2 text-xs border-2 border-[#4F46E5] outline-none bg-white"
+                            className="w-full h-full px-2 text-xs border-2 border-[#059669] outline-none bg-white"
                           >
                             {['Not Applied','Applied','Shortlisted','Interviewed','Selected','Rejected'].map(s => <option key={s}>{s}</option>)}
                           </select>
@@ -1186,14 +1215,14 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                             onChange={e => setEditVal(e.target.value)}
                             onBlur={commitEdit}
                             onKeyDown={handleKeyDown}
-                            className="w-full h-full px-2 text-xs border-2 border-[#4F46E5] outline-none bg-white"
+                            className="w-full h-full px-2 text-xs border-2 border-[#059669] outline-none bg-white"
                             style={{ boxSizing: 'border-box' }}
                           />
                         )
                       ) : (
                         // ── View cell ──
                         <div
-                          className={`w-full h-full flex items-center px-2 overflow-hidden ${col.editable ? 'cursor-cell hover:bg-[#F0F4FF]' : 'cursor-default'} group-hover:bg-opacity-80 transition-colors`}
+                          className={`w-full h-full flex items-center px-2 overflow-hidden ${col.editable ? 'cursor-cell hover:bg-[#F0FDF8]' : 'cursor-default'} group-hover:bg-opacity-80 transition-colors`}
                           title={col.editable ? 'Double-click to edit' : undefined}
                         >
                           {isStage && val ? (
@@ -1201,7 +1230,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
                           ) : isOffer && val ? (
                             <span className="mono inline-block px-1.5 py-0.5 rounded text-[10px] font-600" style={{ background: offerCfg.bg, color: offerCfg.text }}>{val}</span>
                           ) : col.key === 'studentId' ? (
-                            <span className="mono text-[#4F46E5] font-600 text-[11px]">{val}</span>
+                            <span className="mono text-[#059669] font-600 text-[11px]">{val}</span>
                           ) : col.key === 'cgpa' ? (
                             <span className="mono font-600" style={{ color: Number(val) >= 8 ? '#15803D' : Number(val) >= 7 ? '#C2410C' : '#BE123C' }}>{val}</span>
                           ) : col.key === 'package' && val ? (
@@ -1264,6 +1293,7 @@ function StudentSpreadsheet({ rows }: StudentSpreadsheetProps) {
 
 export default function OfficerDashboard({ officerName, officerId, onLogout }: OfficerDashboardProps) {
   const [tab, setTab] = useState<'overview' | 'drives' | 'pipeline' | 'activity' | 'students'>('overview')
+  const [pipelineView, setPipelineView] = useState<'kanban' | 'table'>('kanban')
   const [drives, setDrives] = useState<Drive[]>([])
   const [rows, setRows] = useState<StudentRow[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -1285,7 +1315,11 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
       const resApps = await fetch("http://localhost:8000/api/applications")
       if (resApps.ok) {
         const data = await resApps.json()
-        setRows(data)
+        const normalizedData = data.map((r: any) => ({
+          ...r,
+          stage: normalizeStage(r.stage)
+        }))
+        setRows(normalizedData)
       }
       
       setPulseActive(true)
@@ -1469,7 +1503,7 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
       <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-4">
           <div className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="w-7 h-7 rounded bg-[#4F46E5] flex items-center justify-center">
+            <div className="w-7 h-7 rounded bg-[#059669] flex items-center justify-center">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
@@ -1528,7 +1562,7 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
           </div>
           <button
             onClick={() => setShowAddDrive(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded bg-[#4F46E5] text-white text-sm font-600 hover:bg-[#4338CA] active:bg-[#3730A3] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded bg-[#059669] text-white text-sm font-600 hover:bg-[#047857] active:bg-[#065F46] transition-colors"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Add Drive
@@ -1700,46 +1734,77 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
 
         {/* ── Pipeline ── */}
         {tab === 'pipeline' && (
-          <div className="bg-white rounded-md border border-[#E2E8F0] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#E2E8F0]">
-              <h3 className="text-sm font-700 text-[#0F172A]">Student Pipeline by Company</h3>
-              <p className="text-xs text-[#64748B] mt-0.5">Updated in real-time · counts increase as students progress</p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3 bg-white rounded-md border border-[#E2E8F0] px-5 py-4">
+              <div>
+                <h3 className="text-sm font-700 text-[#0F172A]">Student Pipeline & Selections</h3>
+                <p className="text-xs text-[#64748B] mt-0.5">Track candidates through recruitment funnel stages</p>
+              </div>
+              <div className="inline-flex rounded-md border border-[#E2E8F0] p-1 bg-[#F8F9FC]">
+                <button
+                  onClick={() => setPipelineView('kanban')}
+                  className={`px-3 py-1.5 rounded text-xs font-600 transition-colors cursor-pointer ${
+                    pipelineView === 'kanban' ? 'bg-[#0F172A] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'
+                  }`}
+                >
+                  Kanban Board
+                </button>
+                <button
+                  onClick={() => setPipelineView('table')}
+                  className={`px-3 py-1.5 rounded text-xs font-600 transition-colors cursor-pointer ${
+                    pipelineView === 'table' ? 'bg-[#0F172A] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'
+                  }`}
+                >
+                  Summary Table
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[#F8F9FC] border-b border-[#E2E8F0]">
-                    <th className="text-left px-5 py-3 text-[11px] font-600 uppercase tracking-widest text-[#64748B]">Company</th>
-                    {(['Applied', 'Shortlisted', 'Interviewed', 'Selected', 'Rejected'] as PipelineStage[]).map(s => (
-                      <th key={s} className="text-center px-4 py-3 text-[11px] font-600 uppercase tracking-widest text-[#64748B]">{s}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pipeline.map(row => (
-                    <tr key={row.company} className="border-b border-[#F1F5F9] hover:bg-[#F8F9FC] transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded flex items-center justify-center text-white text-xs font-700" style={{ background: row.logoColor }}>{row.logo}</div>
-                          <span className="font-600 text-[#0F172A]">{row.company}</span>
-                        </div>
-                      </td>
-                      {[
-                        { val: row.applied, bg: '#EFF6FF', text: '#1D4ED8' },
-                        { val: row.shortlisted, bg: '#FFF7ED', text: '#C2410C' },
-                        { val: row.interviewed, bg: '#F5F3FF', text: '#6D28D9' },
-                        { val: row.selected, bg: '#F0FDF4', text: '#15803D' },
-                        { val: row.rejected, bg: '#FFF1F2', text: '#BE123C' },
-                      ].map((cell, i) => (
-                        <td key={i} className="px-4 py-4 text-center">
-                          <span className="mono text-sm font-700 px-2.5 py-0.5 rounded" style={{ background: cell.bg, color: cell.text }}>{cell.val}</span>
-                        </td>
+
+            {pipelineView === 'kanban' ? (
+              <RecruitmentPipeline drives={drives} rows={rows} onRefresh={fetchData} />
+            ) : (
+              <div className="bg-white rounded-md border border-[#E2E8F0] overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#E2E8F0]">
+                  <h3 className="text-sm font-700 text-[#0F172A]">Student Pipeline by Company</h3>
+                  <p className="text-xs text-[#64748B] mt-0.5">Updated in real-time · counts increase as students progress</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-[#F8F9FC] border-b border-[#E2E8F0]">
+                        <th className="text-left px-5 py-3 text-[11px] font-600 uppercase tracking-widest text-[#64748B]">Company</th>
+                        {(['Applied', 'Shortlisted', 'Interviewed', 'Selected', 'Rejected'] as PipelineStage[]).map(s => (
+                          <th key={s} className="text-center px-4 py-3 text-[11px] font-600 uppercase tracking-widest text-[#64748B]">{s}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pipeline.map(row => (
+                        <tr key={row.company} className="border-b border-[#F1F5F9] hover:bg-[#F8F9FC] transition-colors">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded flex items-center justify-center text-white text-xs font-700" style={{ background: row.logoColor }}>{row.logo}</div>
+                              <span className="font-600 text-[#0F172A]">{row.company}</span>
+                            </div>
+                          </td>
+                          {[
+                            { val: row.applied, bg: '#EFF6FF', text: '#1D4ED8' },
+                            { val: row.shortlisted, bg: '#FFF7ED', text: '#C2410C' },
+                            { val: row.interviewed, bg: '#F5F3FF', text: '#6D28D9' },
+                            { val: row.selected, bg: '#F0FDF4', text: '#15803D' },
+                            { val: row.rejected, bg: '#FFF1F2', text: '#BE123C' },
+                          ].map((cell, i) => (
+                            <td key={i} className="px-4 py-4 text-center">
+                              <span className="mono text-sm font-700 px-2.5 py-0.5 rounded" style={{ background: cell.bg, color: cell.text }}>{cell.val}</span>
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1822,7 +1887,7 @@ export default function OfficerDashboard({ officerName, officerId, onLogout }: O
                 <span className="text-xs text-[#4338CA]">Staged changes are saved to SQLite automatically</span>
               </div>
             </div>
-            <StudentSpreadsheet rows={rows} />
+            <StudentSpreadsheet rows={rows} onRefresh={fetchData} />
           </div>
         )}
       </main>

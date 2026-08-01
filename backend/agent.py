@@ -3,9 +3,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import sqlite3
-import google.antigravity
-from google.antigravity import Agent, LocalAgentConfig, types
-from google.antigravity.hooks.hooks import PreToolCallDecideHook, HookContext, HookResult
 from backend.database import DB_PATH
 
 # --- SQLite Tools ---
@@ -42,7 +39,7 @@ async def get_student_applications_db(student_id: str):
     return apps
 
 async def get_drive_status_db(company: str):
-    """Retrieve campus placement drive details and status for a specific company from the local SQLite database.
+    """Retrieve campus placement drive details, requirements, and status for a specific company from the local SQLite database.
     
     Args:
         company: The name of the company (e.g. 'Google', 'Microsoft').
@@ -51,7 +48,7 @@ async def get_drive_status_db(company: str):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT company, date, role, status, package FROM drives WHERE company = ?", (company,))
+    cursor.execute("SELECT company, date, role, status, package, min_cgpa, branches, hr_contact, description FROM drives WHERE company = ?", (company,))
     rows = cursor.fetchall()
     results = []
     for r in rows:
@@ -60,7 +57,11 @@ async def get_drive_status_db(company: str):
             "date": r["date"],
             "role": r["role"],
             "status": r["status"],
-            "package": r["package"]
+            "package": r["package"],
+            "min_cgpa": r["min_cgpa"] or "",
+            "branches": r["branches"] or "",
+            "hr_contact": r["hr_contact"] or "",
+            "description": r["description"] or ""
         })
     conn.close()
     return results
@@ -86,19 +87,31 @@ async def get_all_drives_db():
         "branches": r["branches"]
     } for r in rows]
 
-# --- Safety & Policies Hooks ---
+async def query_placement_database(sql_query: str):
+    """Execute a read-only SQL SELECT query on the college placement database to gather analytics and statistics.
+    Use this tool to answer complex questions about placed/unplaced students, averages, counts, etc.
+    Only SELECT queries are permitted.
+    
+    Args:
+        sql_query: The SQL SELECT statement to execute.
+    """
+    print(f"Tool executing: query_placement_database with query: {sql_query}")
+    query_stripped = sql_query.strip().lower()
+    if not query_stripped.startswith("select"):
+        return {"error": "Access Denied: Only read-only SELECT queries are permitted."}
+    if "update" in query_stripped or "delete" in query_stripped or "insert" in query_stripped or "drop" in query_stripped or "alter" in query_stripped:
+        return {"error": "Access Denied: Writing/mutating database operations are prohibited."}
 
-class RecordIsolationHook(PreToolCallDecideHook):
-    """Enforces that an agent only queries data belonging to the authenticated user."""
-    def __init__(self, authenticated_user_id: str):
-        self.authenticated_user_id = authenticated_user_id
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    try:
+        cursor.execute(sql_query)
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
 
-    async def run(self, context: HookContext, data: types.ToolCall) -> HookResult:
-        if data.name == "get_student_applications_db":
-            student_id = data.args.get("student_id")
-            if student_id != self.authenticated_user_id:
-                return HookResult(
-                    allow=False,
-                    message=f"Access Denied: Record isolation policy violation. Authenticated user {self.authenticated_user_id} is not permitted to read records for student {student_id}."
-                )
-        return HookResult(allow=True)
+# --- SQLite Tools End ---

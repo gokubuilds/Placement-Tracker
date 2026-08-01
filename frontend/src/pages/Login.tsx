@@ -50,7 +50,7 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between w-[44%] bg-[#4F46E5] p-10 relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-between w-[44%] bg-[#059669] p-10 relative overflow-hidden">
         {/* Grid lines decoration */}
         <div
           className="absolute inset-0 opacity-10"
@@ -60,8 +60,8 @@ export default function Login({ onLogin }: LoginProps) {
           }}
         />
         {/* Floating orb */}
-        <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-indigo-400 opacity-20 blur-3xl" />
-        <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-violet-300 opacity-20 blur-2xl" />
+        <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-emerald-400 opacity-20 blur-3xl" />
+        <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-teal-300 opacity-20 blur-2xl" />
 
         {/* Logo */}
         <div className="relative flex items-center gap-3">
@@ -71,6 +71,7 @@ export default function Login({ onLogin }: LoginProps) {
             </svg>
           </div>
           <span className="text-white font-700 text-lg">PlaceTrack</span>
+
         </div>
 
         {/* Center content */}
@@ -82,7 +83,7 @@ export default function Login({ onLogin }: LoginProps) {
           <h1 className="text-4xl font-800 text-white leading-tight">
             Your career<br />starts here.
           </h1>
-          <p className="text-indigo-200 text-sm leading-relaxed max-w-xs">
+          <p className="text-emerald-100 text-sm leading-relaxed max-w-xs">
             Track applications, get AI-powered insights, and land your dream offer — all in one unified placement portal.
           </p>
 
@@ -95,7 +96,7 @@ export default function Login({ onLogin }: LoginProps) {
             ].map(s => (
               <div key={s.label} className="bg-white/10 rounded-md p-3">
                 <p className="text-white text-xl font-800">{s.val}</p>
-                <p className="text-indigo-200 text-xs mt-0.5">{s.label}</p>
+                <p className="text-emerald-100 text-xs mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
@@ -107,10 +108,10 @@ export default function Login({ onLogin }: LoginProps) {
             "PlaceTrack helped me manage 12 applications simultaneously and land my Google offer with confidence."
           </p>
           <div className="flex items-center gap-2 mt-3">
-            <div className="w-7 h-7 rounded-full bg-indigo-300 flex items-center justify-center text-indigo-900 text-xs font-700">RS</div>
+            <div className="w-7 h-7 rounded-full bg-emerald-300 flex items-center justify-center text-emerald-900 text-xs font-700">RS</div>
             <div>
               <p className="text-white text-xs font-600">Riya Singh</p>
-              <p className="text-indigo-300 text-[10px]">SWE @ Google · CSE 2025</p>
+              <p className="text-emerald-200 text-[10px]">SWE @ Google · CSE 2025</p>
             </div>
           </div>
         </div>
@@ -121,7 +122,7 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="w-8 h-8 rounded bg-[#4F46E5] flex items-center justify-center">
+            <div className="w-8 h-8 rounded bg-[#059669] flex items-center justify-center">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
@@ -174,7 +175,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={studentId}
                   onChange={e => setStudentId(e.target.value)}
                   placeholder="e.g. STU_101"
-                  className="w-full px-3.5 py-2.5 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 transition-all placeholder-[#94A3B8] font-mono"
+                  className="w-full px-3.5 py-2.5 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/15 transition-all placeholder-[#94A3B8] font-mono"
                 />
               </div>
             ) : (
@@ -185,7 +186,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={officerId}
                   onChange={e => setOfficerId(e.target.value)}
                   placeholder="e.g. PO_001"
-                  className="w-full px-3.5 py-2.5 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 transition-all placeholder-[#94A3B8] font-mono"
+                  className="w-full px-3.5 py-2.5 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/15 transition-all placeholder-[#94A3B8] font-mono"
                 />
               </div>
             )}
@@ -194,7 +195,7 @@ export default function Login({ onLogin }: LoginProps) {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-600 text-[#374151] uppercase tracking-wide">Password</label>
-                <button type="button" className="text-[11px] text-[#4F46E5] hover:underline font-500">Forgot password?</button>
+                <button type="button" className="text-[11px] text-[#059669] hover:underline font-500">Forgot password?</button>
               </div>
               <div className="relative">
                 <input
@@ -202,7 +203,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder={tab === 'student' ? 'Enter password (hint: 1234)' : 'Enter password (hint: admin)'}
-                  className="w-full px-3.5 py-2.5 pr-10 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 transition-all placeholder-[#94A3B8]"
+                  className="w-full px-3.5 py-2.5 pr-10 text-sm border border-[#E2E8F0] rounded bg-white outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/15 transition-all placeholder-[#94A3B8]"
                 />
                 <button
                   type="button"
@@ -233,7 +234,7 @@ export default function Login({ onLogin }: LoginProps) {
               type="submit"
               disabled={loading}
               className="w-full py-2.5 rounded text-sm font-600 text-white transition-all duration-150 flex items-center justify-center gap-2 mt-1"
-              style={{ background: loading ? '#818CF8' : '#4F46E5' }}
+              style={{ background: loading ? '#34D399' : '#059669' }}
             >
               {loading ? (
                 <>

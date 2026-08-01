@@ -56,13 +56,25 @@ const stageConfig: Record<Stage, { bg: string; text: string; dot: string }> = {
 }
 
 const logoColors: Record<string, string> = {
-  G: '#4285F4', M: '#00A4EF', A: '#0052CC', Z: '#FF3366', R: '#3395FF', S: '#635BFF',
+  G: '#4285F4', M: '#00A4EF', A: '#0052CC', Z: '#FF3366', R: '#3395FF', S: '#059669',
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StageBadge({ stage }: { stage: Stage }) {
-  const cfg = stageConfig[stage]
+function normalizeStage(stage: string): Stage {
+  if (!stage) return 'Applied'
+  const lower = stage.toLowerCase().trim()
+  if (lower === 'applied' || lower === 'not applied' || lower === 'screening') return 'Applied'
+  if (lower === 'shortlisted') return 'Shortlisted'
+  if (lower === 'interview' || lower === 'interviewed' || lower === 'final_round') return 'Interviewed'
+  if (lower === 'selected' || lower === 'offered' || lower === 'issued') return 'Selected'
+  if (lower === 'rejected') return 'Rejected'
+  return 'Applied' // Fallback
+}
+
+function StageBadge({ stage }: { stage: string }) {
+  const norm = normalizeStage(stage)
+  const cfg = stageConfig[norm] ?? { bg: '#F1F5F9', text: '#64748B', dot: '#94A3B8' }
   return (
     <span className="mono inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-500 rounded" style={{ background: cfg.bg, color: cfg.text }}>
       <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: cfg.dot }} />
@@ -73,7 +85,7 @@ function StageBadge({ stage }: { stage: Stage }) {
 
 // CompanyLogo component uses inline styles
 function CompanyLogo({ letter, company }: { letter: string; company: string }) {
-  const color = logoColors[letter] ?? '#4F46E5'
+  const color = logoColors[letter] ?? '#059669'
   return (
     <div className="w-8 h-8 rounded flex items-center justify-center text-white text-sm font-700 flex-shrink-0" style={{ background: color }} aria-label={company}>
       {letter}
@@ -173,7 +185,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
         const data = await res.json()
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: data.reply, time: now() }])
       } else {
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status.", time: now() }])
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "I am not sure about that. Please contact the placement office.", time: now() }])
       }
     } catch (e) {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), from: 'assistant', text: "Error: Could not connect to assistant backend.", time: now() }])
@@ -186,7 +198,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {open && (
         <div className="w-80 sm:w-96 bg-white rounded-md border border-[#E2E8F0] shadow-xl flex flex-col overflow-hidden" style={{ height: '520px' }}>
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E2E8F0] bg-[#4F46E5]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E2E8F0] bg-[#059669]">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded bg-white/20 flex items-center justify-center">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -195,7 +207,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
               </div>
               <div>
                 <p className="text-white text-sm font-600 leading-none">Placement Assistant</p>
-                <p className="text-indigo-200 text-[10px] mt-0.5">AI · Always here to help</p>
+                <p className="text-emerald-100 text-[10px] mt-0.5">AI · Always here to help</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white transition-colors p-1 rounded" aria-label="Close">
@@ -208,7 +220,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
                 <div className={`max-w-[80%] flex flex-col gap-0.5 ${msg.from === 'student' ? 'items-end' : 'items-start'}`}>
                   <div className="px-3 py-2 rounded-md text-sm leading-relaxed"
                     style={msg.from === 'student'
-                      ? { background: '#4F46E5', color: 'white' }
+                      ? { background: '#059669', color: 'white' }
                       : { background: 'white', color: '#0F172A', border: '1px solid #E2E8F0' }
                     }
                   >
@@ -223,7 +235,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
           </div>
           <div className="px-3 pt-2.5 pb-0 flex gap-1.5 flex-wrap border-t border-[#E2E8F0] bg-white">
             {chips.map(chip => (
-              <button key={chip} onClick={() => sendMessage(chip)} className="text-[11px] px-2.5 py-1 rounded border border-[#E2E8F0] text-[#4F46E5] hover:bg-[#EEF2FF] hover:border-[#4F46E5] transition-colors font-500 whitespace-nowrap mb-2">
+              <button key={chip} onClick={() => sendMessage(chip)} className="text-[11px] px-2.5 py-1 rounded border border-[#E2E8F0] text-[#059669] hover:bg-[#ECFDF5] hover:border-[#059669] transition-colors font-500 whitespace-nowrap mb-2">
                 {chip}
               </button>
             ))}
@@ -235,9 +247,9 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
               placeholder="Ask about your placements…"
-              className="flex-1 text-sm px-3 py-2 rounded border border-[#E2E8F0] bg-[#F8F9FC] text-[#0F172A] placeholder-[#94A3B8] outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] transition-colors"
+              className="flex-1 text-sm px-3 py-2 rounded border border-[#E2E8F0] bg-[#F8F9FC] text-[#0F172A] placeholder-[#94A3B8] outline-none focus:border-[#059669] focus:ring-1 focus:ring-[#059669] transition-colors"
             />
-            <button onClick={() => sendMessage(input)} className="px-3 py-2 rounded bg-[#4F46E5] text-white hover:bg-[#4338CA] transition-colors flex-shrink-0" aria-label="Send">
+            <button onClick={() => sendMessage(input)} className="px-3 py-2 rounded bg-[#059669] text-white hover:bg-[#047857] transition-colors flex-shrink-0" aria-label="Send">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
@@ -247,7 +259,7 @@ function ChatWidget({ studentId, studentName, applications }: { studentId: strin
       )}
       <button
         onClick={() => setOpen(o => !o)}
-        className="rounded-full bg-[#4F46E5] text-white shadow-lg hover:bg-[#4338CA] hover:shadow-xl transition-all duration-200 flex items-center justify-center relative"
+        className="rounded-full bg-[#059669] text-white shadow-lg hover:bg-[#047857] hover:shadow-xl transition-all duration-200 flex items-center justify-center relative"
         style={{ width: 52, height: 52 }}
         aria-label="Toggle Placement Assistant"
       >
@@ -302,12 +314,12 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
     return () => ws.close()
   }, [auth.id])
 
-  const filtered = filterStage === 'All' ? apps : apps.filter(a => a.stage === filterStage)
+  const filtered = filterStage === 'All' ? apps : apps.filter(a => normalizeStage(a.stage) === filterStage)
   const stages: (Stage | 'All')[] = ['All', 'Applied', 'Shortlisted', 'Interviewed', 'Selected', 'Rejected']
 
   const appSent = apps.length
-  const shortlisted = apps.filter(a => ['Shortlisted', 'Interviewed', 'Selected'].includes(a.stage)).length
-  const offers = apps.filter(a => a.stage === 'Selected').length
+  const shortlisted = apps.filter(a => ['Shortlisted', 'Interviewed', 'Selected'].includes(normalizeStage(a.stage))).length
+  const offers = apps.filter(a => normalizeStage(a.stage) === 'Selected').length
 
   const studentName = apps.length > 0 ? apps[0].name : auth.name
   const studentBranch = apps.length > 0 ? apps[0].branch : "CSE"
@@ -335,7 +347,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
       <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-4">
           <div className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="w-7 h-7 rounded bg-[#4F46E5] flex items-center justify-center">
+            <div className="w-7 h-7 rounded bg-[#059669] flex items-center justify-center">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
@@ -355,7 +367,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               className="w-full pl-9 pr-3 py-1.5 text-sm bg-[#F8F9FC] border rounded outline-none transition-all duration-150 placeholder-[#94A3B8]"
-              style={{ borderColor: searchFocused ? '#4F46E5' : '#E2E8F0', boxShadow: searchFocused ? '0 0 0 2px rgba(79,70,229,0.12)' : 'none' }}
+              style={{ borderColor: searchFocused ? '#059669' : '#E2E8F0', boxShadow: searchFocused ? '0 0 0 2px rgba(5,150,105,0.12)' : 'none' }}
             />
           </div>
 
@@ -367,7 +379,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
               <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#F97316]" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#4F46E5] flex items-center justify-center text-white text-xs font-700">{initials}</div>
+              <div className="w-8 h-8 rounded-full bg-[#059669] flex items-center justify-center text-white text-xs font-700">{initials}</div>
               <div className="hidden sm:block">
                 <p className="text-xs font-600 text-[#0F172A] leading-none">{studentName}</p>
                 <p className="mono text-[10px] text-[#64748B] mt-0.5">{auth.id}</p>
@@ -390,7 +402,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
           <div className="flex items-center gap-2 mb-1">
             <p className="mono text-[11px] text-[#64748B] uppercase tracking-widest">Dashboard</p>
             <span className="w-1 h-1 rounded-full bg-[#CBD5E1]" />
-            <p className="mono text-[11px] text-[#4F46E5] uppercase tracking-widest">Student View</p>
+            <p className="mono text-[11px] text-[#059669] uppercase tracking-widest">Student View</p>
           </div>
           <h1 className="text-2xl font-800 text-[#0F172A]">Good morning, {studentName.split(' ')[0]} 👋</h1>
           <p className="text-sm text-[#64748B] mt-1">Placement season 2026 · {studentBranch} Batch · {studentCgpa} CGPA</p>
@@ -417,7 +429,7 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
                   onClick={() => setFilterStage(s)}
                   className="text-xs px-3 py-1 rounded border transition-colors duration-150 font-500"
                   style={filterStage === s
-                    ? { background: '#4F46E5', color: 'white', borderColor: '#4F46E5' }
+                    ? { background: '#059669', color: 'white', borderColor: '#059669' }
                     : { background: 'white', color: '#64748B', borderColor: '#E2E8F0' }
                   }
                 >
@@ -460,20 +472,20 @@ function StudentDashboard({ auth, onLogout }: { auth: AuthState; onLogout: () =>
           </div>
           <div className="px-5 py-3 flex items-center justify-between bg-[#F8F9FC]">
             <p className="mono text-[11px] text-[#94A3B8]">Showing {filtered.length} results · Last synced just now</p>
-            <button className="text-[11px] text-[#4F46E5] font-600 hover:underline">View All Drives →</button>
+            <button className="text-[11px] text-[#059669] font-600 hover:underline">View All Drives →</button>
           </div>
         </div>
 
         {/* Info strip */}
-        <div className="mt-6 bg-[#EEF2FF] border border-[#C7D2FE] rounded-md px-5 py-4 flex items-start gap-3">
-          <div className="w-6 h-6 rounded bg-[#4F46E5] flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div className="mt-6 bg-[#ECFDF5] border border-[#6EE7B7] rounded-md px-5 py-4 flex items-start gap-3">
+          <div className="w-6 h-6 rounded bg-[#059669] flex items-center justify-center flex-shrink-0 mt-0.5">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
           </div>
           <div>
-            <p className="text-sm font-600 text-[#4338CA]">3 new drives opening soon</p>
-            <p className="text-xs text-[#6366F1] mt-0.5">Amazon, Flipkart, and PhonePe have posted new campus drives. Eligibility: 7.5+ CGPA, CSE/ECE batch. <span className="underline cursor-pointer">Browse Drives</span></p>
+            <p className="text-sm font-600 text-[#065F46]">3 new drives opening soon</p>
+            <p className="text-xs text-[#059669] mt-0.5">Amazon, Flipkart, and PhonePe have posted new campus drives. Eligibility: 7.5+ CGPA, CSE/ECE batch. <span className="underline cursor-pointer">Browse Drives</span></p>
           </div>
         </div>
       </main>

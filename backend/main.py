@@ -300,11 +300,10 @@ async def create_drive(drive_in: DriveCreate):
     return {"id": str(row_id), "status": "created"}
 
 # =====================================================================
-# 4. Google Antigravity Agent & Refusal Chat Handler
+# 4. Google GenAI Chat Handler (Modularized)
 # =====================================================================
 
-from backend.agent import get_student_applications_db, get_drive_status_db, get_all_drives_db, RecordIsolationHook
-from google.antigravity import Agent, LocalAgentConfig
+from backend.chathandler import handle_chat
 
 class ChatRequest(BaseModel):
     query: str
@@ -317,91 +316,15 @@ async def chat_handler(request: ChatRequest, x_student_id: str = Header(None, al
     if not x_student_id:
         raise HTTPException(status_code=400, detail="X-Student-Id header is required for authentication.")
 
-    # 1. Intent-normalization middleware (trim, lowercase, strip punctuation)
-    normalized_query = request.query.strip().lower().translate(str.maketrans("", "", string.punctuation))
-    print(f"Agent prompt: '{request.query}' -> Normalized: '{normalized_query}'")
-
-    # 2. Setup Google Antigravity Agent Configuration & Run inside try-except
     try:
-        # Fetch student profile details from SQLite first to inject into system instruction
-        student_profile = ""
-        if x_student_id != "OFFICER":
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT student_name, branch, batch, cgpa, email, phone FROM applications WHERE student_id = ? LIMIT 1", (x_student_id,))
-            row = cursor.fetchone()
-            conn.close()
-            if row:
-                student_profile = (
-                    f"You are chatting with {row['student_name']} (Student ID: {x_student_id}).\n"
-                    f"Student Profile:\n"
-                    f"- Branch: {row['branch']}\n"
-                    f"- Batch: {row['batch']}\n"
-                    f"- CGPA: {row['cgpa']}\n"
-                    f"- Email: {row['email']}\n"
-                    f"- Phone: {row['phone']}\n\n"
-                )
-
-        config = LocalAgentConfig()
-        
-        # Register custom SQLite tools on config
-        if x_student_id == "OFFICER":
-            config.tools.append(get_student_applications_db)
-        else:
-            # For students, register a helper tool that queries their own records dynamically
-            async def get_my_placement_status():
-                """
-                Retrieve all of your own placement application records from the database.
-                Includes company, stage, offer status, package, role, and drive date.
-                Use this to answer questions about your own application stages or offer status.
-                """
-                return await get_student_applications_db(x_student_id)
-            
-            config.tools.append(get_my_placement_status)
-
-        config.tools.append(get_drive_status_db)
-        config.tools.append(get_all_drives_db)
-
-        # Register safety record isolation hook only for students, not for officer
-        if x_student_id != "OFFICER":
-            config.hooks.append(RecordIsolationHook(authenticated_user_id=x_student_id))
-
-        if x_student_id == "OFFICER":
-            identity_info = "Note: You are chatting with the Placement Officer. You can query data for any and all students without isolation restrictions.\n"
-        else:
-            identity_info = f"Note: You are chatting with student ID {x_student_id}. Never query data for any other student ID.\n"
-
-        config.system_instructions = (
-            "You are a College Placement Assistant. You have access to tools for retrieving student applications "
-            "and company drive status from a local SQLite database.\n"
-            "You can ONLY help users check:\n"
-            "1. Application Stages\n"
-            "2. Drive Dates / Upcoming Drives\n"
-            "3. Offer Status\n\n"
-            f"{student_profile}"
-            f"{identity_info}"
-            "If the query is out of scope or you cannot retrieve the information using your tools, "
-            "or you are not confident, you MUST reply with exactly: "
-            "'I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status.'"
-        )
-
-        async with Agent(config) as agent:
-            agent_response = await agent.chat(normalized_query)
-            text_reply = await agent_response.text()
-            
-            # Post-check fallback (if agent output is empty)
-            if not text_reply:
-                text_reply = "I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status."
-                
-            return ChatResponse(reply=text_reply)
-            
+        reply = await handle_chat(request.query, x_student_id)
+        return ChatResponse(reply=reply)
     except Exception as e:
         error_msg = str(e)
         if "Access Denied" in error_msg:
             return ChatResponse(reply="Access Denied: You are not authorized to query other students' application records.")
-        
-        print(f"Agent Execution Error: {e}")
-        return ChatResponse(reply="I am not confident about that request. I can only help you check: 1. Application Stages, 2. Drive Dates, 3. Offer Status.")
+        print(f"Chat execution error: {e}")
+        return ChatResponse(reply="I am not sure about that. Please contact the placement office.")
 
 if __name__ == "__main__":
     import uvicorn
